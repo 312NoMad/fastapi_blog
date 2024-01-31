@@ -1,8 +1,14 @@
 import datetime
+from passlib.hash import bcrypt
 
-import sqlalchemy
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import (Column,
+                        Integer,
+                        String,
+                        Text,
+                        DateTime,
+                        ForeignKey,
+                        create_engine)
+from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 
 
 DATABASE_URL = 'sqlite:///./test.db'
@@ -11,18 +17,40 @@ DATABASE_URL = 'sqlite:///./test.db'
 Base = declarative_base()
 
 
-class Post(Base):
+class AbstractBase(Base):
+    __abstract__ = True
+
+    id = Column(Integer, primary_key=True, index=True)
+    
+    created_at = Column(DateTime, default=datetime.datetime.now())
+    updated_at = Column(DateTime, default=datetime.datetime.now())
+
+
+class Post(AbstractBase):
     __tablename__ = 'posts'
 
-    id = sqlalchemy.Column(sqlalchemy.Integer, primary_key=True, index=True)
-    title = sqlalchemy.Column(sqlalchemy.String(length=255), index=True)
-    text = sqlalchemy.Column(sqlalchemy.Text)
+    title = Column(String(length=255), index=True)
+    text = Column(Text)
     
-    created_at = sqlalchemy.Column(sqlalchemy.DateTime, default=datetime.datetime.now())
-    updated_at = sqlalchemy.Column(sqlalchemy.DateTime, default=datetime.datetime.now())
+    user = relationship('User', back_populates='posts')
+    user_id = Column(Integer, ForeignKey('users.id'))
 
 
-engine = sqlalchemy.create_engine(DATABASE_URL)
+class User(AbstractBase):
+    __tablename__ = 'users'
+
+    email = Column(String(length=255), unique=True)
+    first_name = Column(String(length=255), nullable=True, default=None)
+    last_name = Column(String(length=255), nullable=True, default=None)
+    hashed_password = Column(String)
+
+    posts = relationship('Post', back_populates='user')
+
+    def verify_password(self, plain_password):
+        return bcrypt(plain_password, self.hashed_password)
+
+
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
 
